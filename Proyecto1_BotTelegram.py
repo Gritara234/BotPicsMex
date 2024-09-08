@@ -8,18 +8,15 @@ from dotenv import load_dotenv
 from aiohttp import web
 import asyncio
 
-
 load_dotenv()
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 if not TOKEN:
     raise ValueError("No TOKEN provided. Set TELEGRAM_BOT_TOKEN environment variable.")
-
 
 PRICES = {
     "Paquete Básico": "$100",
@@ -197,25 +194,21 @@ async def web_app(application):
     site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get("PORT", 8080)))
     await site.start()
 
-    while True:
-        await asyncio.sleep(3600)  
-
-def main() -> None:
+async def main() -> None:
     try:
         application = Application.builder().token(TOKEN).build()
 
-       
         application.add_handler(CommandHandler('start', start))
         application.add_handler(CallbackQueryHandler(button_click))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
+        await application.initialize()
+        await application.start()
+        await web_app(application)
         
-        asyncio.run(application.initialize())
-        asyncio.run(application.start())
-        asyncio.run(web_app(application))
-        
+        await application.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         logger.error(f"Error in main function: {str(e)}")
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
