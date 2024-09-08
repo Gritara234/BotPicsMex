@@ -2,14 +2,10 @@ import asyncio
 import os
 import logging
 import random
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from telegram.constants import ParseMode
 from dotenv import load_dotenv
-from aiohttp import web  # Added for the web server
 
 # Load environment variables
 load_dotenv()
@@ -18,16 +14,11 @@ load_dotenv()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Get bot token and email credentials from environment variables
+# Get bot token from environment variable
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-APPOINTMENT_EMAIL = os.getenv('APPOINTMENT_EMAIL')  # Your email where the form will be sent
-EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')  # Email password for authentication
 
 if not TOKEN:
     raise ValueError("No TOKEN provided. Set TELEGRAM_BOT_TOKEN environment variable.")
-
-if not APPOINTMENT_EMAIL or not EMAIL_PASSWORD:
-    raise ValueError("No email credentials provided. Set APPOINTMENT_EMAIL and EMAIL_PASSWORD environment variables.")
 
 # Define Prices, FAQs, Location, and Sample Photos
 PRICES = {
@@ -53,7 +44,7 @@ SAMPLE_PHOTOS = [
     "https://i.imgur.com/TpJWkpZ.png"
 ]
 
-WELCOME_IMAGE_URL = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSvRMOhhFEONDKXZ2Xyb8N-T1C7AAGklkGNIA&s"  # Replace with your actual welcome image URL
+WELCOME_IMAGE_URL = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSvRMOhhFEONDKXZ2Xyb8N-T1C7AAGklkGNIA&s"
 
 REVIEWS = [
     "¡Excelente servicio! Las fotos quedaron hermosas. - María G.",
@@ -74,51 +65,52 @@ PAYMENT_METHODS = [
     "Efectivo (solo para pagos en persona)"
 ]
 
-# Define services available for appointment
-SERVICES = ["Fotografía Básica", "Fotografía de Boda", "Fotografía de Retrato", "Fotografía Corporativa"]
-
 async def start(update: Update, context) -> None:
     if 'photo_message_ids' not in context.user_data:
         context.user_data['photo_message_ids'] = []
     await show_main_menu(update, context)
 
 async def show_main_menu(update: Update, context) -> None:
-    # Delete any existing sample photos
-    await delete_sample_photos(update, context)
+    try:
+        await delete_sample_photos(update, context)
 
-    keyboard = [
-        [InlineKeyboardButton("Ver Precios", callback_data='prices')],
-        [InlineKeyboardButton("Ver Fotos de Muestra", callback_data='samples')],
-        [InlineKeyboardButton("Ubicación", callback_data='location')],
-        [InlineKeyboardButton("Preguntas Frecuentes", callback_data='faqs')],
-        [InlineKeyboardButton("Agendar Cita", callback_data='appntmnt')],
-        [InlineKeyboardButton("Siguiente ➡️", callback_data='next_page')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+        keyboard = [
+            [InlineKeyboardButton("Ver Precios", callback_data='prices')],
+            [InlineKeyboardButton("Ver Fotos de Muestra", callback_data='samples')],
+            [InlineKeyboardButton("Ubicación", callback_data='location')],
+            [InlineKeyboardButton("Preguntas Frecuentes", callback_data='faqs')],
+            [InlineKeyboardButton("Siguiente ➡️", callback_data='next_page')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-    welcome_text = '¡Bienvenido a PicsMex Photography! ¿Cómo puedo asistirte hoy?'
-    message_text = f'<a href="{WELCOME_IMAGE_URL}">&#8205;</a>{welcome_text}'
+        welcome_text = '¡Bienvenido a PicsMex Photography! ¿Cómo puedo asistirte hoy?'
+        message_text = f'<a href="{WELCOME_IMAGE_URL}">&#8205;</a>{welcome_text}'
 
-    if update.message:
-        await update.message.reply_html(message_text, reply_markup=reply_markup)
-    elif update.callback_query:
-        await update.callback_query.message.edit_text(message_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        if update.message:
+            await update.message.reply_html(message_text, reply_markup=reply_markup)
+        elif update.callback_query:
+            await update.callback_query.message.edit_text(message_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    except Exception as e:
+        logger.error(f"Error in show_main_menu: {str(e)}")
 
 async def show_second_page(update: Update, context) -> None:
-    await delete_sample_photos(update, context)
+    try:
+        await delete_sample_photos(update, context)
 
-    keyboard = [
-        [InlineKeyboardButton("Reseñas", callback_data='reviews')],
-        [InlineKeyboardButton("Redes Sociales", callback_data='social_media')],
-        [InlineKeyboardButton("Métodos de Pago", callback_data='payment_methods')],
-        [InlineKeyboardButton("⬅️ Anterior", callback_data='prev_page')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+        keyboard = [
+            [InlineKeyboardButton("Reseñas", callback_data='reviews')],
+            [InlineKeyboardButton("Redes Sociales", callback_data='social_media')],
+            [InlineKeyboardButton("Métodos de Pago", callback_data='payment_methods')],
+            [InlineKeyboardButton("⬅️ Anterior", callback_data='prev_page')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-    page_text = 'Página 2: Más información sobre PicsMex Photography'
-    message_text = f'<a href="{WELCOME_IMAGE_URL}">&#8205;</a>{page_text}'
+        page_text = 'Página 2: Más información sobre PicsMex Photography'
+        message_text = f'<a href="{WELCOME_IMAGE_URL}">&#8205;</a>{page_text}'
 
-    await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    except Exception as e:
+        logger.error(f"Error in show_second_page: {str(e)}")
 
 async def button_click(update: Update, context) -> None:
     query = update.callback_query
@@ -136,8 +128,6 @@ async def button_click(update: Update, context) -> None:
         elif query.data == 'faqs':
             faqs = "\n\n".join([f"{question}\n{answer}" for question, answer in FAQS.items()])
             await show_info(update, context, f"Preguntas Frecuentes:\n\n{faqs}")
-        elif query.data == 'appntmnt':
-            await start_appointment_form(update, context)
         elif query.data == 'next_page':
             await show_second_page(update, context)
         elif query.data == 'prev_page':
@@ -153,28 +143,33 @@ async def button_click(update: Update, context) -> None:
             await show_info(update, context, f"Métodos de pago aceptados:\n\n{payment_methods_text}")
         elif query.data == 'back_to_menu':
             await show_main_menu(update, context)
-
     except Exception as e:
         logger.error(f"Error in button_click: {str(e)}")
         await query.edit_message_text(text="Lo siento, ocurrió un error. Por favor, inténtalo de nuevo más tarde.")
 
 async def show_info(update: Update, context, text: str, parse_mode=ParseMode.HTML) -> None:
-    keyboard = [[InlineKeyboardButton("Volver al Menú", callback_data='back_to_menu')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    message_text = f'<a href="{WELCOME_IMAGE_URL}">&#8205;</a>{text}'
-    
-    await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup, parse_mode=parse_mode)
+    try:
+        keyboard = [[InlineKeyboardButton("Volver al Menú", callback_data='back_to_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        message_text = f'<a href="{WELCOME_IMAGE_URL}">&#8205;</a>{text}'
+        
+        await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup, parse_mode=parse_mode)
+    except Exception as e:
+        logger.error(f"Error in show_info: {str(e)}")
 
 async def send_sample_photos(update: Update, context) -> None:
-    chat_id = update.callback_query.message.chat_id
-    context.user_data['photo_message_ids'] = []
-    
-    selected_photos = random.sample(SAMPLE_PHOTOS, 3)
-    
-    for photo_url in selected_photos:
-        message = await context.bot.send_photo(chat_id=chat_id, photo=photo_url)
-        context.user_data['photo_message_ids'].append(message.message_id)
+    try:
+        chat_id = update.callback_query.message.chat_id
+        context.user_data['photo_message_ids'] = []
+        
+        selected_photos = random.sample(SAMPLE_PHOTOS, 3)
+        
+        for photo_url in selected_photos:
+            message = await context.bot.send_photo(chat_id=chat_id, photo=photo_url)
+            context.user_data['photo_message_ids'].append(message.message_id)
+    except Exception as e:
+        logger.error(f"Error in send_sample_photos: {str(e)}")
 
 async def delete_sample_photos(update: Update, context) -> None:
     if 'photo_message_ids' in context.user_data:
@@ -193,25 +188,19 @@ async def handle_message(update: Update, context) -> None:
     else:
         await update.message.reply_text('Por favor, usa los botones del menú para interactuar conmigo.')
 
-async def web_server():
-    port = int(os.environ.get("PORT", 5000))  # Get the PORT from environment or use 5000
-    app = web.Application()
-    app.add_routes([web.get('/', lambda request: web.Response(text="PicsMex Photography Bot is running."))])
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
+def main() -> None:
+    try:
+        application = Application.builder().token(TOKEN).build()
 
-async def main():
-    application = Application.builder().token(TOKEN).build()
+        # Register command and callback handlers
+        application.add_handler(CommandHandler('start', start))
+        application.add_handler(CallbackQueryHandler(button_click))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Register command and callback handlers
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CallbackQueryHandler(button_click))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # Run both the Telegram bot and the web server
-    await asyncio.gather(application.start(), web_server())
+        # Start the bot
+        application.run_polling()
+    except Exception as e:
+        logger.error(f"Error in main function: {str(e)}")
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
