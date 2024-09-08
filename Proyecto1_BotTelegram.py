@@ -9,6 +9,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from telegram.constants import ParseMode
 from dotenv import load_dotenv
+from aiohttp import web  # Added for the web server
 
 # Load environment variables
 load_dotenv()
@@ -50,7 +51,6 @@ SAMPLE_PHOTOS = [
     "https://i.imgur.com/BA76eje.png",
     "https://i.imgur.com/S0BBzXu.png",
     "https://i.imgur.com/TpJWkpZ.png"
-
 ]
 
 WELCOME_IMAGE_URL = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSvRMOhhFEONDKXZ2Xyb8N-T1C7AAGklkGNIA&s"  # Replace with your actual welcome image URL
@@ -187,73 +187,22 @@ async def delete_sample_photos(update: Update, context) -> None:
         context.user_data['photo_message_ids'] = []
 
 async def handle_message(update: Update, context) -> None:
-    user_input = update.message.text
-    stage = context.user_data.get('appointment_stage')
+    text = update.message.text.lower()
+    if text == 'start':
+        await start(update, context)
+    else:
+        await update.message.reply_text('Por favor, usa los botones del menú para interactuar conmigo.')
 
-    if stage == 'name':
-        context.user_data['client_name'] = user_input
-        await update.message.reply_text("Gracias. Ahora, por favor ingresa tu número de teléfono:")
-        context.user_data['appointment_stage'] = 'phone'
-    elif stage == 'phone':
-        context.user_data['client_phone'] = user_input
-        await update.message.reply_text("¿Qué servicio estás solicitando? Elige una opción:\n" +
-                                        "\n".join([f"{i+1}. {service}" for i, service in enumerate(SERVICES)]))
-        context.user_data['appointment_stage'] = 'service'
-    elif stage == 'service':
-        try:
-            service_index = int(user_input) - 1
-            if service_index < 0 or service_index >= len(SERVICES):
-                raise ValueError
-            context.user_data['client_service'] = SERVICES[service_index]
-            await update.message.reply_text("Gracias. ¿Qué fecha prefieres para la cita? (Formato: DD/MM/AAAA)")
-            context.user_data['appointment_stage'] = 'date'
-        except ValueError:
-            await update.message.reply_text("Por favor, ingresa un número válido para el servicio.")
-    elif stage == 'date':
-        context.user_data['client_date'] = user_input
-        await update.message.reply_text("Gracias por completar el formulario. Enviando tus detalles...")
+async def web_server():
+    port = int(os.environ.get("PORT", 5000))  # Get the PORT from environment or use 5000
+    app = web.Application()
+    app.add_routes([web.get('/', lambda request: web.Response(text="PicsMex Photography Bot is running."))])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
 
-        # Send the email with the appointment data
-        await send_appointment_email(context.user_data)
-
-        await update.message.reply_text("Tu cita ha sido solicitada exitosamente. Nos pondremos en contacto contigo pronto.")
-        context.user_data['appointment_stage'] = None  # Clear the stage after form submission
-
-async def start_appointment_form(update: Update, context) -> None:
-    await update.callback_query.message.reply_text("Por favor, ingresa tu nombre:")
-    context.user_data['appointment_stage'] = 'name'
-
-async def send_appointment_email(user_data) -> None:
-    # Set up email content
-    client_name = user_data['client_name']
-    client_phone = user_data['client_phone']
-    client_service = user_data['client_service']
-    client_date = user_data['client_date']
-
-    subject = f"Solicitud de Cita de {client_name}"
-    body = (f"Nombre del Cliente: {client_name}\n"
-            f"Teléfono: {client_phone}\n"
-            f"Servicio Solicitado: {client_service}\n"
-            f"Fecha de la Cita: {client_date}")
-
-    # Compose the email
-    msg = MIMEMultipart()
-    msg['From'] = APPOINTMENT_EMAIL
-    msg['To'] = APPOINTMENT_EMAIL
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
-
-    # Send the email
-    try:
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(APPOINTMENT_EMAIL, EMAIL_PASSWORD)
-            server.send_message(msg)
-        logging.info(f"Appointment email sent successfully to {APPOINTMENT_EMAIL}")
-    except Exception as e:
-        logging.error(f"Failed to send appointment email: {str(e)}")
-
-def main() -> None:
+async def main():
     application = Application.builder().token(TOKEN).build()
 
     # Register command and callback handlers
@@ -261,8 +210,8 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(button_click))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Start the Bot
-    application.run_polling()
+    # Run both the Telegram bot and the web server
+    await asyncio.gather(application.start(), web_server())
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
