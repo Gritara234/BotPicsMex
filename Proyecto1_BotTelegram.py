@@ -1,4 +1,3 @@
-import asyncio
 import os
 import logging
 import random
@@ -6,6 +5,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from telegram.constants import ParseMode
 from dotenv import load_dotenv
+from aiohttp import web
+import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -188,6 +189,18 @@ async def handle_message(update: Update, context) -> None:
     else:
         await update.message.reply_text('Por favor, usa los botones del menú para interactuar conmigo.')
 
+async def web_app(application):
+    app = web.Application()
+    app.router.add_get("/", lambda request: web.Response(text="PicsMex Photography Bot is running!"))
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get("PORT", 8080)))
+    await site.start()
+
+    while True:
+        await asyncio.sleep(3600)  # Sleep for an hour
+
 def main() -> None:
     try:
         application = Application.builder().token(TOKEN).build()
@@ -197,8 +210,11 @@ def main() -> None:
         application.add_handler(CallbackQueryHandler(button_click))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-        # Start the bot
-        application.run_polling()
+        # Start the bot and the web server
+        asyncio.run(application.initialize())
+        asyncio.run(application.start())
+        asyncio.run(web_app(application))
+        
     except Exception as e:
         logger.error(f"Error in main function: {str(e)}")
 
