@@ -8,20 +8,19 @@ from dotenv import load_dotenv
 from aiohttp import web
 import asyncio
 
-# Load environment variables
+
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Get bot token from environment variable
+
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 if not TOKEN:
     raise ValueError("No TOKEN provided. Set TELEGRAM_BOT_TOKEN environment variable.")
 
-# Define Prices, FAQs, Location, and Sample Photos
+
 PRICES = {
     "Paquete Básico": "$100",
     "Paquete Estándar": "$200",
@@ -199,18 +198,18 @@ async def web_app(application):
     await site.start()
 
     while True:
-        await asyncio.sleep(3600)  # Sleep for an hour
+        await asyncio.sleep(3600)  
 
 def main() -> None:
     try:
         application = Application.builder().token(TOKEN).build()
 
-        # Register command and callback handlers
+       
         application.add_handler(CommandHandler('start', start))
         application.add_handler(CallbackQueryHandler(button_click))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-        # Start the bot and the web server
+        
         asyncio.run(application.initialize())
         asyncio.run(application.start())
         asyncio.run(web_app(application))
