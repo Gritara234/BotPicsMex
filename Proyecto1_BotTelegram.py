@@ -136,10 +136,14 @@ async def button_click(update: Update, context) -> None:
             await query.edit_message_text(text="Aquí tienes algunas de nuestras fotos de muestra:")
             await send_sample_photos(update, context)
         elif query.data == 'location':
-            latitude = 40.748817
-            longitude = -73.985428
+            latitude = 19.00507
+            longitude = -98.20443
             message = await context.bot.send_location(chat_id=query.message.chat_id, latitude=latitude, longitude=longitude)
             context.user_data['location_message_id'] = message.message_id
+
+            keyboard = [[InlineKeyboardButton("Volver al Menú", callback_data='back_to_menu')]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.message.reply_text("¿Deseas regresar al menú principal?", reply_markup=reply_markup)
         elif query.data == 'faqs':
             faqs = "\n\n".join([f"{question}\n{answer}" for question, answer in FAQS.items()])
             await show_info(update, context, f"Preguntas Frecuentes:\n\n{faqs}")
@@ -246,6 +250,11 @@ async def handle_message(update: Update, context) -> None:
         await send_appointment_email(context.user_data)
 
         await update.message.reply_text("Tu cita ha sido solicitada exitosamente. Nos pondremos en contacto contigo pronto.")
+
+        keyboard = [[InlineKeyboardButton("Volver al Menú", callback_data='back_to_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("¿Deseas regresar al menú principal?", reply_markup=reply_markup)
+
         context.user_data['appointment_stage'] = None  
 
 async def start_appointment_form(update: Update, context) -> None:
